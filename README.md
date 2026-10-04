@@ -1,6 +1,10 @@
-# Folio
+<p align="center">
+  <img src="assets/folio-header.gif" alt="Folio · Document Workspace" width="900">
+</p>
 
-**A focused workspace for asking questions of your PDFs—and checking the evidence.**
+<p align="center">
+  <strong>A focused workspace for asking questions of your PDFs—and checking the evidence.</strong>
+</p>
 
 Folio is an in-memory, session-based Retrieval-Augmented Generation (RAG) application built with Python and Streamlit. It allows users to upload text-based PDFs, indexes them locally on the server's CPU with SentenceTransformers and FAISS, and answers questions through Groq using retrieved passages. Every answer is grounded in exact quotes verified in Python, pairing each claim with verifiable, page-level citations and inspectable source passages. Designed with privacy in mind, Folio runs with zero database dependencies, no user accounts, and no persistent document storage.
 
