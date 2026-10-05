@@ -8,14 +8,14 @@ from streamlit.testing.v1 import AppTest
 from src.config import Config
 from src.generation.groq_client import GroqGenerator
 from src.rag.pipeline import Pipeline
-from src.retrieval.embeddings import SentenceTransformerEmbeddings
-from fakes import FakeGroq, FakeSentenceTransformer
+from src.retrieval.embeddings import JinaEmbeddings
+from fakes import FakeGroq, FakeJinaClient
 from test_ingestion import pdf_bytes
 
 
 class UITests(unittest.TestCase):
     def setUp(self):
-        self.config = Config(groq_api_key="test")
+        self.config = Config(groq_api_key="test", jina_api_key="test")
         self.env = patch("src.config.Config.from_env", return_value=self.config)
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -32,9 +32,9 @@ class UITests(unittest.TestCase):
         self.assertEqual(app.title[0].value, "Read deeper. Ask better.")
 
     def test_indexing_without_api_keys_keeps_chat_disabled(self):
-        data = pdf_bytes("Local embeddings preserve this passage for retrieval.")
+        data = pdf_bytes("Jina embeddings preserve this passage for retrieval.")
         upload = SimpleNamespace(name="local.pdf", size=len(data), getvalue=lambda: data)
-        model = FakeSentenceTransformer()
+        client = FakeJinaClient()
         # AppTest cannot populate file_uploader; represent the pending upload
         # until indexing advances the uploader's version and clears it.
         def uploaded_files(*args, **kwargs):
@@ -42,7 +42,7 @@ class UITests(unittest.TestCase):
 
         with patch("src.config.Config.from_env", return_value=Config()), \
              patch("streamlit.file_uploader", side_effect=uploaded_files), \
-             patch("src.retrieval.embeddings.load_model", return_value=model):
+             patch("src.rag.pipeline.JinaEmbeddings", side_effect=lambda cfg: JinaEmbeddings(cfg, client)):
             app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run()
             index_button = next(button for button in app.button if button.label == "Index documents")
             self.assertFalse(index_button.disabled)
@@ -51,13 +51,13 @@ class UITests(unittest.TestCase):
             pipeline = app.session_state.pipeline
             self.assertEqual([doc.source for doc in pipeline.documents.values()], ["local.pdf"])
             self.assertIsNotNone(pipeline.store)
-            self.assertEqual(len(model.calls), 1)
+            self.assertEqual(len(client.calls), 1)
             self.assertTrue(app.session_state.processing_results[0][0])
             self.assertTrue(app.chat_input[0].disabled)
 
     def test_workspace_question_removal_and_reset_confirmation(self):
         app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run()
-        pipeline = Pipeline(self.config, SentenceTransformerEmbeddings(self.config, FakeSentenceTransformer()), GroqGenerator(self.config, FakeGroq()))
+        pipeline = Pipeline(self.config, JinaEmbeddings(self.config, FakeJinaClient()), GroqGenerator(self.config, FakeGroq()))
         doc = pipeline.add_pdf(pdf_bytes("Folio retrieves passages and preserves source pages."), "notes.pdf")
         app.session_state.pipeline = pipeline
         app.run()

@@ -108,7 +108,7 @@ with st.sidebar:
             st.rerun()
     st.caption("Temporary by design. No account. No permanent chat history.")
     with st.expander("Privacy & limits", icon=":material/info:"):
-        st.write("PDFs and search data stay in server memory for this session. Embeddings run locally on the server's CPU. Selected passages and questions go to Groq; its data policies apply.")
+        st.write("PDFs, FAISS search data, and session state stay in server memory for this session. Jina creates embeddings; selected passages and questions go to Groq. Provider data policies apply.")
         st.caption("Text PDFs only · 20 MB per file · 50 MB total · 8 documents · 500 pages per file · 3,000 passages · 40 questions.")
         st.caption("Reloads, disconnections, or server restarts may end the session. Browser exit warnings are best effort, especially on mobile.")
 
@@ -119,8 +119,8 @@ st.html(f'<div class="folio-topline"><span>FOLIO &nbsp; / &nbsp; DOCUMENT WORKSP
 
 if not config.groq_api_key:
     with st.expander("Connect Groq to answer questions", expanded=True, icon=":material/settings:"):
-        st.info("Server setup needed: GROQ_API_KEY")
-        st.write("Add the key to `.env` (see `.env.example`) or your hosting environment, then restart the app. Documents can be indexed without an API key. No visitor account is required.")
+        st.info("Server setup needed: GROQ_API_KEY and JINA_API_KEY")
+        st.write("Add both keys to `.env` (see `.env.example`) or your hosting environment, then restart the app. No visitor account is required.")
 
 if not pipeline.documents and not pipeline.history:
     empty_state()
@@ -136,8 +136,8 @@ upload_area = st.expander("Add documents", expanded=not bool(pipeline.documents)
 with upload_area:
     uploads = st.file_uploader("Bring your PDFs into focus", type=["pdf"], accept_multiple_files=True,
                                key=f"uploads_{st.session_state.upload_version}",
-                               help="Text-based PDFs, up to 20 MB each. Indexing runs locally on the server; selected passages go to Groq when you ask a question.")
-    st.caption("Indexing runs locally on the server's CPU. First use may take longer while the model downloads. Selected passages are sent to Groq when you ask a question.")
+                               help="Text-based PDFs, up to 20 MB each. Text is sent to Jina for embeddings; selected passages go to Groq when you ask a question.")
+    st.caption("Jina creates document embeddings when indexing and query embeddings for each question. Vectors and FAISS search stay in session memory. Selected passages are sent to Groq when you ask a question.")
     if st.button("Index documents", type="primary", icon=":material/arrow_forward:",
                  disabled=not uploads):
         results = []

@@ -6,27 +6,28 @@ from src.config import Config
 from src.errors import AppError
 from src.generation.groq_client import GroqGenerator
 from src.rag.pipeline import Pipeline
-from src.retrieval.embeddings import SentenceTransformerEmbeddings
-from fakes import FakeGroq, FakeSentenceTransformer
+from src.retrieval.embeddings import JinaEmbeddings
+from fakes import FakeGroq, FakeJinaClient
 from test_ingestion import pdf_bytes
 
 
 class PipelineTests(unittest.TestCase):
     def setUp(self):
-        self.model, self.groq = FakeSentenceTransformer(), FakeGroq()
-        self.pipeline = Pipeline(Config(), SentenceTransformerEmbeddings(Config(), self.model), GroqGenerator(Config(), self.groq))
+        self.model, self.groq = FakeJinaClient(), FakeGroq()
+        config = Config(jina_api_key="test")
+        self.pipeline = Pipeline(config, JinaEmbeddings(config, self.model), GroqGenerator(config, self.groq))
 
     def test_full_pdf_to_answer_and_no_document_reembedding(self):
         stages = []
         document = self.pipeline.add_pdf(pdf_bytes("Retrieval finds relevant passages in documents."), "notes.pdf", stages.append)
         self.assertEqual(stages[-1], "Ready")
         document_texts = [chunk.text for chunk in document.chunks]
-        self.assertEqual([texts for texts, _ in self.model.calls], [document_texts])
+        self.assertEqual(self.model.calls[0]["input"], document_texts)
         self.pipeline.ask("What does retrieval do?")
         self.pipeline.ask("Explain that simply.")
         self.assertEqual(len(self.model.calls), 3)
-        self.assertEqual(sum(texts == document_texts for texts, _ in self.model.calls), 1)
-        self.assertIn("What does retrieval do?", self.model.calls[-1][0][0])
+        self.assertEqual(sum(call["task"] == "retrieval.passage" for call in self.model.calls), 1)
+        self.assertIn("What does retrieval do?", self.model.calls[-1]["input"][0])
         self.assertEqual(self.pipeline.history[0].answer.citations[0].document_id, document.id)
         payload = json.loads(self.groq.calls[-1]["messages"][1]["content"])
         self.assertNotIn("source", payload["evidence"][0])
@@ -65,7 +66,7 @@ class PipelineTests(unittest.TestCase):
         first = self.pipeline.add_pdf(pdf_bytes("The first document has useful evidence."), "first.pdf")
         first_vectors = first.vectors.copy()
         second = self.pipeline.add_pdf(pdf_bytes("The second document has different evidence."), "second.pdf")
-        self.assertEqual([texts for texts, _ in self.model.calls],
+        self.assertEqual([call["input"] for call in self.model.calls if call["task"] == "retrieval.passage"],
                          [[chunk.text for chunk in first.chunks], [chunk.text for chunk in second.chunks]])
         self.assertTrue((first.vectors == first_vectors).all())
         self.assertEqual(len(self.pipeline.store.chunks), len(first.chunks) + len(second.chunks))

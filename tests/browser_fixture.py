@@ -13,21 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 os.environ["GROQ_API_KEY"] = "browser-test-only"
+os.environ["JINA_API_KEY"] = "browser-test-only"
 
 import streamlit as st
 
-from fakes import FakeGroq, FakeSentenceTransformer
+from fakes import FakeGroq, FakeJinaClient
 from src.config import Config
 from src.generation.groq_client import GroqGenerator
 from src.rag.pipeline import Pipeline
-from src.retrieval.embeddings import SentenceTransformerEmbeddings
+from src.retrieval.embeddings import JinaEmbeddings
 
 config = Config.from_env()
 if "pipeline" not in st.session_state:
-    st.session_state.pipeline = Pipeline(config, SentenceTransformerEmbeddings(config, FakeSentenceTransformer()), GroqGenerator(config, FakeGroq()))
+    st.session_state.pipeline = Pipeline(config, JinaEmbeddings(config, FakeJinaClient()), GroqGenerator(config, FakeGroq()))
     st.session_state.upload_version = 0
     st.session_state.exported_turns = 0
     st.session_state.processing_results = []
-with patch("src.rag.pipeline.SentenceTransformerEmbeddings", side_effect=lambda cfg: SentenceTransformerEmbeddings(cfg, FakeSentenceTransformer())), \
+with patch("src.rag.pipeline.JinaEmbeddings", side_effect=lambda cfg: JinaEmbeddings(cfg, FakeJinaClient())), \
      patch("src.rag.pipeline.GroqGenerator", side_effect=lambda cfg: GroqGenerator(cfg, FakeGroq())):
     runpy.run_path(str(ROOT / "app.py"), run_name="__main__")

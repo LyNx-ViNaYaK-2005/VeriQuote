@@ -24,7 +24,7 @@ class VectorStore:
             return []
         vector = normalized_vectors(query, 1)
         if vector.shape[1] != self.index.d:
-            raise AppError("Query and document embedding dimensions differ. Start a new session after changing models.")
+            raise AppError("Query and document embedding dimensions differ. Start a new session.")
         try:
             scores, positions = self.index.search(vector, min(limit, len(self.chunks)))
             return [Hit(self.chunks[int(i)], float(score))

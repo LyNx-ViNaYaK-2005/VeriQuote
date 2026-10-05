@@ -6,7 +6,7 @@ import numpy as np
 from src.config import Config
 from src.errors import AppError
 from src.models import Chunk
-from src.retrieval.embeddings import SentenceTransformerEmbeddings
+from src.retrieval.embeddings import JinaEmbeddings
 from src.retrieval.retriever import retrieve
 from src.retrieval.vector_store import VectorStore
 
@@ -16,15 +16,17 @@ def chunk(identity, text, page=1):
 
 
 class RetrievalTests(unittest.TestCase):
-    def test_local_embeddings_work_with_faiss_inner_product(self):
-        # Non-unit vectors and a non-default dimension verify normalization
-        # and dynamic dimensions through the local adapter and real FAISS.
-        model = Mock()
-        model.encode.side_effect = [
-            np.array([[2, 0, 0, 0, 0], [0, 3, 0, 0, 0]], dtype=np.float64),
-            np.array([[0, 10, 0, 0, 0]], dtype=np.float64),
-        ]
-        embedder = SentenceTransformerEmbeddings(Config(), model)
+    def test_jina_vectors_work_with_faiss_inner_product(self):
+        from fakes import FakeJinaClient
+        client = FakeJinaClient()
+        # API-shaped deterministic vectors keep this test offline.
+        client.post = Mock(side_effect=[
+            type("Response", (), {"raise_for_status": lambda self: None, "json": lambda self: {"data": [
+                {"index": 0, "embedding": [2, 0, 0, 0, 0]}, {"index": 1, "embedding": [0, 3, 0, 0, 0]}]}})(),
+            type("Response", (), {"raise_for_status": lambda self: None, "json": lambda self: {"data": [
+                {"index": 0, "embedding": [0, 10, 0, 0, 0]}]}})(),
+        ])
+        embedder = JinaEmbeddings(Config(jina_api_key="test"), client)
         chunks = [chunk("a", "Apples are fruit."), chunk("b", "Networks transport packets.", 3)]
         vectors = embedder.embed_documents([item.text for item in chunks])
         query = embedder.embed_query("How are packets transported?")
@@ -37,9 +39,6 @@ class RetrievalTests(unittest.TestCase):
         hits = retrieve(store, query, min_score=0.25)
         self.assertEqual([hit.chunk for hit in hits], [chunks[1]])
         self.assertAlmostEqual(hits[0].score, 1)
-        for call in model.encode.call_args_list:
-            self.assertIs(call.kwargs["normalize_embeddings"], True)
-            self.assertIs(call.kwargs["convert_to_numpy"], True)
 
     def test_faiss_vector_mapping_and_score(self):
         chunks = [chunk("a", "Apples are fruit."), chunk("b", "Networks transport packets.", 3)]

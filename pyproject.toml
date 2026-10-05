@@ -10,21 +10,9 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "faiss-cpu>=1.15.1",
     "groq>=1.7.0",
+    "httpx>=0.28.1",
     "numpy>=2.4.6",
     "pymupdf>=1.28.2",
     "python-dotenv>=1.2.4",
-    "sentence-transformers>=6.1.0",
     "streamlit>=1.65.0",
-    "torch>=2.14.1",
 ]
-
-# Declare torch directly too, so uv applies this CPU source to its resolution.
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true

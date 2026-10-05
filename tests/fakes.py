@@ -2,18 +2,18 @@
 from types import SimpleNamespace
 import json
 
-import numpy as np
 
 
-class FakeSentenceTransformer:
+class FakeJinaClient:
     def __init__(self):
         self.calls = []
 
-    def encode(self, texts, **kwargs):
-        self.calls.append((list(texts), kwargs))
-        # Deliberately return unnormalized float64 data to exercise the
-        # embedding adapter's normalization and FAISS dtype guarantee.
-        return np.array([[1.0, 0.2, 0.1] for _ in texts], dtype=np.float64)
+    def post(self, url, headers, json):
+        self.calls.append(json)
+        vectors = [[1.0, 0.2, 0.1] for _ in json["input"]]
+        return SimpleNamespace(raise_for_status=lambda: None,
+                               json=lambda: {"data": [{"index": i, "embedding": value}
+                                                       for i, value in enumerate(vectors)]})
 
 
 class FakeGroq:

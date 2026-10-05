@@ -11,8 +11,8 @@ from src.errors import AppError
 class Config:
     groq_api_key: str = field(default="", repr=False)
     groq_model: str = "openai/gpt-oss-20b"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_device: str = "cpu"
+    jina_api_key: str = field(default="", repr=False)
+    embedding_model: str = "jina-embeddings-v3"
     chunk_size: int = 1100
     overlap: int = 200
     batch_size: int = 32
@@ -25,8 +25,6 @@ class Config:
     context_chars: int = 7200
 
     def __post_init__(self) -> None:
-        if self.embedding_device != "cpu":
-            raise AppError("EMBEDDING_DEVICE must be cpu. This deployment uses CPU embeddings.")
         if self.batch_size < 1:
             raise AppError("The embedding batch size must be positive.")
 
@@ -44,7 +42,7 @@ class Config:
         return cls(
             groq_api_key=value("GROQ_API_KEY"),
             groq_model=value("GROQ_MODEL", cls.groq_model),
-            embedding_model=value("EMBEDDING_MODEL", cls.embedding_model),
-            embedding_device=value("EMBEDDING_DEVICE", cls.embedding_device),
+            jina_api_key=value("JINA_API_KEY"),
+            embedding_model=value("JINA_EMBEDDING_MODEL", cls.embedding_model),
             min_similarity=threshold,
         )

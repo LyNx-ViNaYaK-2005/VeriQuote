@@ -6,7 +6,7 @@
   <strong>A focused workspace for asking questions of your PDFs—and checking the evidence.</strong>
 </p>
 
-Folio is an in-memory, session-based Retrieval-Augmented Generation (RAG) application built with Python and Streamlit. It allows users to upload text-based PDFs, indexes them locally on the server's CPU with SentenceTransformers and FAISS, and answers questions through Groq using retrieved passages. Every answer is grounded in exact quotes verified in Python, pairing each claim with verifiable, page-level citations and inspectable source passages. Designed with privacy in mind, Folio runs with zero database dependencies, no user accounts, and no persistent document storage.
+Folio is an in-memory, session-based Retrieval-Augmented Generation (RAG) application built with Python and Streamlit. It extracts text from PDFs, sends page-bounded chunks to Jina AI for embeddings, searches locally with FAISS, and generates grounded answers through Groq. Every answer is checked in Python for valid evidence IDs and exact quotes, with page-level citations and inspectable source passages. No database or persistent document storage is used.
 
 ---
 
@@ -22,15 +22,14 @@ Folio is an in-memory, session-based Retrieval-Augmented Generation (RAG) applic
 
 ## Key Features
 
-- **Strict Evidence Grounding**: Validates evidence IDs and verifies that supporting quotes exist verbatim in retrieved passages before displaying claims.
-- **Page-Level Citations**: Deduplicates citations by document and physical page number; click any citation to view the supporting quote and full context.
-- **Local CPU Embeddings**: Generates 384-dimensional embeddings on CPU via `all-MiniLM-L6-v2`; no external embedding API key or quota needed.
-- **Exact Cosine Vector Search**: Fast inner-product similarity search over unit-normalized vectors using FAISS (`IndexFlatIP`).
-- **Heuristic Near-Duplicate Filtering**: Excludes redundant passages using 5-word shingle overlap and enforces similarity thresholds.
-- **Referential Follow-Ups**: Detects pronouns ("explain that", "elaborate") and enriches queries using previous questions.
-- **Session Privacy & Ephemeral State**: PDFs and vectors exist only in server memory for the active session; no database storage or tracking.
-- **Export Transcripts**: One-click download of questions, answers, and numbered page citations as clean Markdown or plain text.
-- **Browser Exit Protection**: Built-in `beforeunload` guard warns users before accidental tab closure when unsaved turns exist.
+- **Strict Evidence Grounding**: Validates evidence IDs and verifies supporting quotes exist in retrieved passages.
+- **Page-Level Citations**: Citations map to document pages and open to supporting quotes and source context.
+- **Jina AI Embeddings**: Jina generates document vectors during indexing and query vectors for each question; `JINA_API_KEY` is required.
+- **Local FAISS Search**: Exact inner-product search over normalized vectors, kept in session memory.
+- **Heuristic Near-Duplicate Filtering**: Suppresses redundant passages using 5-word shingle overlap and similarity thresholds.
+- **Session Privacy & Ephemeral State**: PDFs, vectors, and conversations remain in server memory for the active session.
+- **Export Transcripts**: Download questions, answers, and page citations as Markdown or plain text.
+- **Browser Exit Protection**: Warns users before accidental tab closure when unsaved turns exist.
 
 ---
 
@@ -38,40 +37,33 @@ Folio is an in-memory, session-based Retrieval-Augmented Generation (RAG) applic
 
 | Layer | Technology |
 | --- | --- |
-| **Frontend & UI** | [Streamlit](https://streamlit.io/) (custom dark workspace theme, responsive components) |
-| **PDF Extraction** | [PyMuPDF](https://pymupdf.readthedocs.io/) (sorted in-memory text extraction, NFKC normalization) |
-| **Text Chunking** | Custom page-bounded chunker (sentence/paragraph preference, zero cross-page leakage) |
-| **Embeddings** | [SentenceTransformers](https://www.sbert.net/) (`all-MiniLM-L6-v2`, local CPU execution) |
-| **Vector Store** | [FAISS CPU](https://github.com/facebookresearch/faiss) (`IndexFlatIP`, exact cosine similarity) |
-| **Generation** | [Groq](https://groq.com/) (`openai/gpt-oss-20b`, zero temperature, JSON object mode) |
-| **Package Management** | [uv](https://docs.astral.sh/uv/) (deterministic CPU PyTorch resolution via `uv.lock`) |
+| **Frontend & UI** | [Streamlit](https://streamlit.io/) |
+| **PDF Extraction** | [PyMuPDF](https://pymupdf.readthedocs.io/) |
+| **Text Chunking** | Custom page-bounded chunker |
+| **Embeddings** | [Jina AI Embeddings API](https://jina.ai/embeddings/) (`jina-embeddings-v3`) |
+| **Vector Store** | [FAISS CPU](https://github.com/facebookresearch/faiss) (`IndexFlatIP`) |
+| **Generation** | [Groq](https://groq.com/) (`openai/gpt-oss-20b`) |
+| **Package Management** | [uv](https://docs.astral.sh/uv/) |
 
 ---
 
 ## Architecture Summary
 
 ```
-PDF Uploads (in-memory)
-       │
-       ▼
-PyMuPDF Extraction & Page-Bounded Chunking
-       │
-       ▼
-Local CPU Embeddings (SentenceTransformers) ──► FAISS Vector Store
-                                                      │
-User Question ──► Embedding ──► Cosine Retrieval ◄────┘
-                                      │
-                                      ▼
-Groq LLM Generation (Structured Claims + Quoted Evidence)
-                                      │
-                                      ▼
-Python Verification (Quote containment & Evidence ID validation)
-                                      │
-                                      ▼
-Verified Answer + Page Citations + Inspectable Passages
+PDF → PyMuPDF → page-bounded chunking → Jina AI Embeddings API → FAISS
+                                                           ↑        ↓
+User question → Jina query embedding → retrieval ───────────┘
+                                      ↓
+                         Groq grounded generation
+                                      ↓
+                 Python citation verification
+                                      ↓
+                Grounded answer + citations
 ```
 
-For the complete module breakdown and architectural diagrams, see the [Architecture Guide](docs/architecture.md).
+PDF parsing, chunking, FAISS indexing/search, citation verification, and session state run locally in the service. Jina embeddings and Groq generation are remote API calls. No local ML model, PyTorch, or CUDA is required.
+
+For the complete module breakdown, see the [Architecture Guide](docs/architecture.md).
 
 ---
 
@@ -81,7 +73,7 @@ For the complete module breakdown and architectural diagrams, see the [Architect
 
 - Python 3.11–3.13
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- A free [Groq API Key](https://console.groq.com/)
+- [Groq API key](https://console.groq.com/) and [Jina API key](https://jina.ai/embeddings/)
 
 ### 1. Install Dependencies
 
@@ -89,18 +81,17 @@ For the complete module breakdown and architectural diagrams, see the [Architect
 uv sync
 ```
 
-*Note: `uv sync` automatically installs lightweight CPU-only PyTorch wheels configured in `pyproject.toml`.*
-
 ### 2. Configure Environment
-
-Copy the example `.env` file and add your Groq API key:
 
 ```bash
 cp .env.example .env
 ```
 
+Set both required credentials in `.env`:
+
 ```ini
 GROQ_API_KEY=gsk_your_groq_api_key_here
+JINA_API_KEY=your_jina_api_key_here
 ```
 
 ### 3. Run the App
@@ -109,7 +100,7 @@ GROQ_API_KEY=gsk_your_groq_api_key_here
 uv run streamlit run app.py
 ```
 
-Open `http://localhost:8501`, upload one or more text PDFs, click **Index documents**, and start asking questions!
+Open `http://localhost:8501`, upload text PDFs, click **Index documents**, and ask questions.
 
 ---
 
@@ -117,37 +108,35 @@ Open `http://localhost:8501`, upload one or more text PDFs, click **Index docume
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `GROQ_API_KEY` | **Yes** | `""` | Server-side key for Groq LLM inference. |
-| `GROQ_MODEL` | No | `openai/gpt-oss-20b` | Groq chat model with JSON object mode support. |
-| `EMBEDDING_MODEL` | No | `sentence-transformers/all-MiniLM-L6-v2` | Hugging Face model ID for local embeddings. |
-| `EMBEDDING_DEVICE` | No | `cpu` | Execution device; must remain `cpu`. |
-| `MIN_SIMILARITY` | No | `0.25` | Cosine similarity cutoff for retrieved passages. |
+| `GROQ_API_KEY` | **Yes** | `""` | Server-side Groq generation key. |
+| `JINA_API_KEY` | **Yes** | `""` | Server-side Jina embedding key. |
+| `GROQ_MODEL` | No | `openai/gpt-oss-20b` | Groq chat model. |
+| `JINA_EMBEDDING_MODEL` | No | `jina-embeddings-v3` | Jina embedding model. |
+| `MIN_SIMILARITY` | No | `0.25` | Similarity cutoff for retrieved passages. |
 
 ---
 
 ## Detailed Documentation
 
-Comprehensive technical documentation is organized in the [`docs/`](docs/) directory:
-
-- 📐 [**Architecture Guide**](docs/architecture.md): System components, data structures, and Streamlit session lifecycle.
-- 🔄 [**RAG Pipeline Deep Dive**](docs/rag-pipeline.md): Step-by-step extraction, chunking, retrieval filtering, grounding, and fallback mechanics.
-- 🛠️ [**Setup & Testing Guide**](docs/setup.md): Complete setup walkthrough, offline unit tests, real-model tests, and browser QA fixture.
-- 🚀 [**Deployment Guidelines**](docs/deployment.md): CPU-first cloud deployment, container build commands, sizing, and RAM considerations.
-- ⚠️ [**Limitations & Trade-offs**](docs/limitations.md): Ephemeral memory design, lack of OCR, single-stage retrieval, and verification scope.
+- 📐 [**Architecture Guide**](docs/architecture.md)
+- 🔄 [**RAG Pipeline Deep Dive**](docs/rag-pipeline.md)
+- 🛠️ [**Setup & Testing Guide**](docs/setup.md)
+- 🚀 [**Deployment Guidelines**](docs/deployment.md)
+- ⚠️ [**Limitations & Trade-offs**](docs/limitations.md)
 
 ---
 
 ## Known Limitations
 
-- **Session-Only Memory**: No persistent database; refreshing the page or restarting the server clears the active workspace.
-- **No OCR**: Requires text-based PDFs; scanned image-only PDFs must be OCR-processed before upload.
-- **CPU Startup Footprint**: Initial run downloads the embedding model (~90 MB); subsequent runs and sessions reuse the cached model.
-- **Groq API Required**: Answers require an active Groq API key, though indexing and embeddings run completely locally and offline.
+- **Session-Only Memory**: Refreshing the page, ending the session, or restarting the service clears documents and conversation.
+- **No OCR**: Scanned image-only PDFs need OCR before upload.
+- **Provider Dependency**: Indexing and questions require Jina; answer generation also requires Groq. Provider quotas, rate limits, and availability apply.
+- **In-Memory FAISS**: Search indices are local to a service process and are not shared across instances.
 
-For full details, review [docs/limitations.md](docs/limitations.md).
+For details, see [docs/limitations.md](docs/limitations.md).
 
 ---
 
 ## Project Status
 
-Folio is maintained as an open-source portfolio project demonstrating clean, reliable RAG engineering principles, deterministic verification, and privacy-conscious design.
+Folio is maintained as an open-source portfolio project demonstrating evidence-grounded RAG, deterministic citation verification, and privacy-conscious session design.

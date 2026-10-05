@@ -10,7 +10,7 @@ from src.generation.groq_client import GroqGenerator
 from src.ingestion.chunker import chunk_pages
 from src.ingestion.pdf_loader import document_id, extract_pdf, safe_filename
 from src.models import Document, Turn
-from src.retrieval.embeddings import SentenceTransformerEmbeddings
+from src.retrieval.embeddings import JinaEmbeddings
 from src.retrieval.retriever import retrieve
 from src.retrieval.vector_store import VectorStore
 
@@ -18,7 +18,7 @@ from src.retrieval.vector_store import VectorStore
 class Pipeline:
     def __init__(self, config: Config, embedder=None, generator=None):
         self.config = config
-        self.embedder = embedder or SentenceTransformerEmbeddings(config)
+        self.embedder = embedder or JinaEmbeddings(config)
         self.generator = generator or GroqGenerator(config)
         self.documents: dict[str, Document] = {}
         self.store: VectorStore | None = None
