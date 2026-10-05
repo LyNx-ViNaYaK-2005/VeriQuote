@@ -12,7 +12,8 @@ Return a JSON object with exactly this shape:
 
 Each claim must be fully supported by its evidence, including every number and
 comparison. Each quote must be at least 12 characters (or the full passage if
-shorter). Use only supplied evidence IDs. Do not put citation markers, filenames,
+shorter). A synthesized overview may combine multiple supplied passages in one
+claim; cite each supporting passage with its own exact quote. Use only supplied evidence IDs. Do not put citation markers, filenames,
 page numbers, Markdown, or URLs into claim text; the application adds citations.
 Use 1–8 clear claims. Honor the requested answer style without weakening grounding.
 If evidence is insufficient, irrelevant, contradictory about the requested fact,

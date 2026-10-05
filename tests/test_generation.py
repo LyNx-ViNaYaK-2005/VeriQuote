@@ -24,6 +24,20 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(answer.citations[0].source, "notes.pdf")
         self.assertEqual(answer.citations[0].page, 2)
 
+    def test_synthesized_claim_can_use_multiple_exact_quotes(self):
+        first = hit("a", page=1)
+        second = Hit(Chunk("b", "doc", "The method compares retrieval quality across sections.",
+                           "notes.pdf", 3, 1), .42)
+        answer = validate_answer({"claims": [{
+            "text": "The document describes retrieval and evaluates its quality.",
+            "evidence": [
+                {"id": "E1", "quote": "Retrieval finds relevant passages in a document."},
+                {"id": "E2", "quote": "The method compares retrieval quality across sections."},
+            ],
+        }]}, [first, second])
+        self.assertNotEqual(answer.text, FALLBACK)
+        self.assertEqual([item.page for item in answer.citations], [1, 3])
+
     def test_unknown_citation_fabricated_quote_and_malformed_fail_closed(self):
         for payload in ({"claims": [claim("E99")]}, {"claims": [claim(quote="fabricated quotation")]},
                         {"claims": [claim(), claim(quote="x")]}, {"claims": "wrong"}, None,

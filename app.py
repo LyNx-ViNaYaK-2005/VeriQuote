@@ -1,5 +1,6 @@
 """Folio's Streamlit entry point. All uploaded content is session-owned."""
 import logging
+import os
 
 import streamlit as st
 
@@ -14,6 +15,9 @@ from src.ui.styles import apply_styles
 
 st.set_page_config(page_title="Folio · Document workspace", page_icon="▤", layout="wide")
 logging.basicConfig(level=logging.WARNING)
+if os.getenv("FOLIO_RETRIEVAL_DEBUG") == "1":
+    logging.getLogger("src.retrieval.retriever").setLevel(logging.DEBUG)
+    logging.getLogger("src.generation.groq_client").setLevel(logging.DEBUG)
 apply_styles()
 
 try:

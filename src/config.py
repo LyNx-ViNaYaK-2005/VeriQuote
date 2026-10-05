@@ -16,7 +16,8 @@ class Config:
     chunk_size: int = 1100
     overlap: int = 200
     batch_size: int = 32
-    min_similarity: float = 0.25
+    # Jina v3 scores are not calibrated like the previous model's scores.
+    min_similarity: float = 0.10
     max_file_bytes: int = 20 * 1024 * 1024
     max_session_bytes: int = 50 * 1024 * 1024
     max_documents: int = 8
@@ -34,7 +35,7 @@ class Config:
         def value(name: str, default: str = "") -> str:
             return os.getenv(name, "").strip() or default
         try:
-            threshold = float(value("MIN_SIMILARITY", "0.25"))
+            threshold = float(value("MIN_SIMILARITY", "0.10"))
             if not -1 <= threshold <= 1:
                 raise ValueError
         except ValueError as exc:

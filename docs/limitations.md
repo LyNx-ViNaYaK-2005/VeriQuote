@@ -16,7 +16,7 @@
 
 - **Jina API dependency**: Document indexing and each question's query embedding require outbound access to Jina and a valid `JINA_API_KEY`. Jina availability, quota, and rate limits apply; indexing may fail or be delayed when the service is unavailable.
 - **Repeated indexing cost**: Document vectors are reused within the active session, but newly indexed text requires Jina requests. Avoid repeatedly indexing the same documents; exact duplicate PDFs are rejected.
-- **Retrieval quality**: Search quality depends on source extraction and chunk boundaries. `MIN_SIMILARITY=0.25` is an uncalibrated cosine cutoff; relevant passages may fall below it.
+- **Retrieval quality**: Search quality depends on source extraction and chunk boundaries. `MIN_SIMILARITY=0.10` is still an uncalibrated cosine cutoff; when all candidates fall below it, the best positive match is passed to Groq for grounded relevance assessment.
 - **Deduplication trade-off**: Repeated boilerplate can cause valid passages to be suppressed by 5-word shingle overlap.
 - **No reranker**: Folio uses one FAISS similarity retrieval stage without a cross-encoder reranker or multi-hop reasoning.
 

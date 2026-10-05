@@ -112,7 +112,7 @@ Open `http://localhost:8501`, upload text PDFs, click **Index documents**, and a
 | `JINA_API_KEY` | **Yes** | `""` | Server-side Jina embedding key. |
 | `GROQ_MODEL` | No | `openai/gpt-oss-20b` | Groq chat model. |
 | `JINA_EMBEDDING_MODEL` | No | `jina-embeddings-v3` | Jina embedding model. |
-| `MIN_SIMILARITY` | No | `0.25` | Similarity cutoff for retrieved passages. |
+| `MIN_SIMILARITY` | No | `0.10` | Similarity cutoff for retrieved passages; the best positive match is still assessed by Groq when all candidates fall below it. |
 
 ---
 

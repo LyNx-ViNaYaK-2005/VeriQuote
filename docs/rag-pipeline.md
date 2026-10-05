@@ -20,7 +20,7 @@ Question → Jina query embedding → FAISS similarity retrieval
 3. **Document embeddings**: When documents are indexed, unique chunk texts are sent in batches to Jina using `JINA_EMBEDDING_MODEL` (default `jina-embeddings-v3`). The resulting vectors are normalized and cached in the active session.
 4. **FAISS indexing**: Normalized vectors are added to local `IndexFlatIP`; inner product is cosine similarity. FAISS positions map directly to source chunks.
 5. **Query embedding**: Each question (including any follow-up query context) is embedded through Jina for that question.
-6. **Similarity retrieval**: FAISS ranks passages. `MIN_SIMILARITY`, near-duplicate filtering, and a context character budget limit the selected evidence.
+6. **Similarity retrieval**: FAISS ranks passages. Specific questions use `MIN_SIMILARITY`, near-duplicate filtering, and a context budget; if every score misses the cutoff, a best positive match is retained for Groq's grounded relevance assessment. Broad summary questions select up to ten representative passages across source pages without applying the generic-query similarity cutoff.
 7. **Grounded generation**: Groq receives the question and selected passages and returns structured claims, evidence IDs, and exact quotes.
 8. **Citation verification**: Python checks that evidence IDs came from retrieved passages and quotes occur verbatim after whitespace normalization. Citations use source filenames and physical page numbers from the chunks.
 

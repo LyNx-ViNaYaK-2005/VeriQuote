@@ -1,5 +1,6 @@
 """Generate structured claims, validate support, then assign citations in Python."""
 import json
+import logging
 import re
 
 from groq import Groq
@@ -8,6 +9,8 @@ from src.config import Config
 from src.errors import AppError, provider_error
 from src.generation.prompts import FALLBACK, SYSTEM_PROMPT
 from src.models import Answer, Citation, Hit, Support
+
+logger = logging.getLogger(__name__)
 
 
 def compact(value: str) -> str:
@@ -18,10 +21,12 @@ def validate_answer(payload, hits: list[Hit]) -> Answer:
     """Fail closed: no partially validated generated answer is shown."""
     fallback = Answer(FALLBACK, context=hits)
     if not isinstance(payload, dict) or not isinstance(payload.get("claims"), list):
+        logger.debug("generation verification rejected malformed claims payload; retrieved_passages=%d", len(hits))
         fallback.note = "The model response did not pass evidence validation."
         return fallback
     claims = payload["claims"]
     if not claims:
+        logger.debug("generation abstained with no claims; retrieved_passages=%d", len(hits))
         return fallback
     try:
         if len(claims) > 8:
@@ -60,6 +65,7 @@ def validate_answer(payload, hits: list[Hit]) -> Answer:
             sentences.append(plain + " " + " ".join(f"[{n}]" for n in numbers))
         return Answer("\n\n".join(sentences), list(citations.values()), hits)
     except (KeyError, TypeError, ValueError):
+        logger.debug("generation verification rejected evidence or quote; retrieved_passages=%d", len(hits))
         fallback.note = "The model response did not pass evidence validation."
         return fallback
 
@@ -99,5 +105,6 @@ class GroqGenerator:
                 raise ValueError
             payload = json.loads(choice.message.content)
         except (ValueError, TypeError, IndexError, AttributeError):
+            logger.debug("generation returned incomplete or invalid JSON; retrieved_passages=%d", len(hits))
             return Answer(FALLBACK, context=hits, note="The model returned an incomplete or invalid response.")
         return validate_answer(payload, hits)

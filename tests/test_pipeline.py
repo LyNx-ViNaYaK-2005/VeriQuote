@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from src.config import Config
 from src.errors import AppError
 from src.generation.groq_client import GroqGenerator
@@ -32,6 +34,47 @@ class PipelineTests(unittest.TestCase):
         payload = json.loads(self.groq.calls[-1]["messages"][1]["content"])
         self.assertNotIn("source", payload["evidence"][0])
         self.assertNotIn("vectors", payload)
+
+    def test_broad_questions_return_grounded_answers_with_page_citations(self):
+        document = self.pipeline.add_pdf(
+            pdf_bytes("Folio organizes reports into searchable passages.",
+                      "Its evidence view connects answers to original pages.",
+                      "Readers can export their conversation."), "overview.pdf")
+        for question in ("What is this document about?", "Summarize the key ideas."):
+            with self.subTest(question=question):
+                turn = self.pipeline.ask(question)
+                self.assertNotEqual(turn.answer.text, "I couldn't find that information in the provided documents.")
+                self.assertTrue(turn.answer.citations)
+                self.assertEqual(turn.answer.citations[0].source, document.source)
+                self.assertTrue(all(citation.page in (1, 2, 3) for citation in turn.answer.citations))
+                self.assertGreaterEqual(len(turn.answer.context), 3)
+
+    def test_specific_supported_and_unrelated_questions(self):
+        self.pipeline.add_pdf(pdf_bytes("The evidence inspector links each claim to a quoted passage."), "notes.pdf")
+        supported = self.pipeline.ask("What does the evidence inspector link to each claim?")
+        self.assertTrue(supported.answer.citations)
+        self.assertIn("evidence inspector", supported.answer.text)
+        unrelated = self.pipeline.ask("What will the weather be tomorrow?")
+        self.assertEqual(unrelated.answer.text, "I couldn't find that information in the provided documents.")
+
+    def test_low_absolute_top_match_reaches_grounded_generation(self):
+        class LowScoreEmbedder:
+            def embed_documents(self, texts):
+                return np.array([[0.20, np.sqrt(0.96)] for _ in texts], dtype=np.float32)
+
+            def embed_query(self, query):
+                return np.array([[1.0, 0.0]], dtype=np.float32)
+
+            def retain(self, texts):
+                pass
+
+        config = Config(min_similarity=0.25)
+        pipeline = Pipeline(config, LowScoreEmbedder(), GroqGenerator(config, FakeGroq()))
+        pipeline.add_pdf(pdf_bytes("The report explains evidence-based retrieval."), "report.pdf")
+        answer = pipeline.ask("What does the report explain?").answer
+        self.assertAlmostEqual(answer.context[0].score, 0.20, places=5)
+        self.assertTrue(answer.citations)
+        self.assertNotEqual(answer.text, "I couldn't find that information in the provided documents.")
 
     def test_bad_file_and_index_failure_preserve_good_documents(self):
         good = self.pipeline.add_pdf(pdf_bytes("First document content."), "first.pdf")

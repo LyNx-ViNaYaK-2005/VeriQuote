@@ -58,6 +58,25 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(retrieve(store, np.array([[-1, 0]]), min_score=0.2), [])
         self.assertEqual(retrieve(store, np.array([[1, 0]]), max_chars=10), [])
 
+    def test_positive_top_match_survives_low_absolute_score(self):
+        chunks = [chunk("relevant", "The report describes evidence-based retrieval."),
+                  chunk("less", "A separate passage covers unrelated procedures.", 2)]
+        vectors = np.array([[0.20, np.sqrt(0.96)], [0.10, np.sqrt(0.99)]], dtype=np.float32)
+        store = VectorStore(chunks, vectors)
+        hits = retrieve(store, np.array([[1.0, 0.0]]), min_score=0.25)
+        self.assertEqual(hits[0].chunk, chunks[0])
+        self.assertAlmostEqual(hits[0].score, 0.20, places=5)
+
+    def test_broad_retrieval_covers_distinct_pages_without_similarity_cutoff(self):
+        chunks = [chunk("a", "Page one contains a substantive research finding.", 1),
+                  chunk("b", "Page two explains the method and its limits.", 2),
+                  chunk("c", "Page three presents implications for future work.", 3)]
+        store = VectorStore(chunks, np.array([[0.1, np.sqrt(.99)], [0.2, np.sqrt(.96)],
+                                               [0.15, np.sqrt(.9775)]]))
+        hits = retrieve(store, np.array([[1.0, 0.0]]), top_k=3,
+                        min_score=0.25, broad=True, query_text="Summarize this document")
+        self.assertEqual({hit.chunk.page for hit in hits}, {1, 2, 3})
+
     def test_mismatched_vectors(self):
         with self.assertRaises(AppError):
             VectorStore([chunk("a", "hello")], np.array([[1, 0], [0, 1]]))

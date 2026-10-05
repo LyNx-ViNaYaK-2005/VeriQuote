@@ -16,7 +16,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.groq_model, "openai/gpt-oss-20b")
         self.assertEqual(config.groq_api_key, "")
         self.assertEqual(config.jina_api_key, "")
-        self.assertEqual(config.min_similarity, 0.25)
+        self.assertEqual(config.min_similarity, 0.10)
 
     @patch("src.config.load_dotenv")
     def test_environment_overrides_and_blank_defaults(self, _load_dotenv):

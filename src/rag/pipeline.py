@@ -11,7 +11,7 @@ from src.ingestion.chunker import chunk_pages
 from src.ingestion.pdf_loader import document_id, extract_pdf, safe_filename
 from src.models import Document, Turn
 from src.retrieval.embeddings import JinaEmbeddings
-from src.retrieval.retriever import retrieve
+from src.retrieval.retriever import is_broad_question, retrieve
 from src.retrieval.vector_store import VectorStore
 
 
@@ -85,8 +85,10 @@ class Pipeline:
         query = question
         if previous and re.search(r"\b(it|its|they|them|their|this|that|these|those|more|elaborate)\b", question, re.I):
             query = f"{previous[-1][:500]}\nFollow-up: {question}"
+        broad = is_broad_question(question)
         hits = retrieve(self.store, self.embedder.embed_query(query), top_k,
-                        self.config.min_similarity, self.config.context_chars)
+                        self.config.min_similarity, self.config.context_chars,
+                        query_text=query, broad=broad)
         answer = self.generator.generate(question, hits, style, previous)
         turn = Turn(question, answer)
         self.history.append(turn)
